@@ -1,0 +1,33 @@
+doc = { SOI ~ NEWLINE* ~ (any_type ~ NEWLINE*)* ~ any_type? ~ EOI }
+
+rich_text = { italics+ | bold+ | superscript+ | subscript+ | strikethrough+ | text | inline_code_block+ }
+
+paragraph = { NEWLINE? ~ rich_text+ ~ NEWLINE }
+
+text = _{ ANY+ }
+
+superscript = _{ "^" ~ text ~ "^" }
+subscript = _{ "___" ~ text ~ "___" }
+strikethrough = _{ "~~" ~ text ~ "~~" }
+italics = _{ "*" ~ !"*" ~ text ~ "*" }
+bold = _{ "**" ~ text ~ "**" }
+
+// todo: add support for language
+fenced_code_block = { NEWLINE ~ "```" ~ text ~ NEWLINE ~ "```" ~ NEWLINE }
+inline_code_block = { "`" ~ text ~ "`" }
+
+code_block = { fenced_code_block | inline_code_block }
+
+// todo: add support for nested lists
+list = { ordered_list | unordered_list }
+unordered_list = { NEWLINE ~ ("+ " ~ rich_text ~ NEWLINE)+ ~ NEWLINE }
+ordered_list = { NEWLINE ~ (ASCII_DIGIT ~ ". " ~ rich_text ~ NEWLINE)+ ~ NEWLINE }
+
+table = { headings+ ~ NEWLINE ~ rows+ }
+headings = { "|" ~ WHITESPACE? ~ text ~ WHITESPACE? ~ "|" }
+rows = { "|" ~ WHITESPACE ~ rich_text ~ WHITESPACE? ~ "|" }
+WHITESPACE = { " " }
+
+header = { NEWLINE? ~ "#"{1, 6} ~ " " ~ ASCII_ALPHANUMERIC+ ~ NEWLINE? }
+
+any_type = { header | paragraph | fenced_code_block | list }
