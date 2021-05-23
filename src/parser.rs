@@ -20,8 +20,8 @@ pub enum AstNode<'a> {
 fn generate_rich_text_output(rich_text: RichText) -> String {
     match rich_text {
         RichText::Text(text) => text,
-        RichText::Bold(text) => format!("<b>{}</b>", text),
-        RichText::Italics(text) => format!("<i>{}</i>", text),
+        RichText::Bold(text) => format!("<strong>{}</strong>", text),
+        RichText::Italics(text) => format!("<em>{}</em>", text),
         RichText::StrikeThrough(text) => format!("<del>{}</del>", text),
         RichText::Subscript(text) => format!("<sub>{}</sub>", text),
         RichText::Superscript(text) => format!("<sup>{}</sup>", text),
@@ -174,7 +174,7 @@ pub struct Table {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     /// Niche errors
-    Other(String),
+    Other(&'static str),
     /// The given source is invalid in some way
     Invalid,
 }

@@ -1,13 +1,13 @@
 [package]
-name = "proteus"
+name = "deimos"
 description = "an extensible MarkDown format for every purpose"
 version = "0.0.1"
 authors = ["hvlck <just.ethan@protonmail.com>"]
 edition = "2018"
 readme = "README.md"
-homepage = "https://github.com/hvlck/proteus"
-repository = "https://github.com/hvlck/proteus"
-license = "MIT"
+homepage = "https://github.com/hvlck/deimos"
+repository = "https://github.com/hvlck/deimos"
+license = "Apache-2.0"
 publish = false
 
 [dependencies]

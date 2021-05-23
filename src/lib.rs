@@ -8,17 +8,20 @@ use pest_derive::*;
 
 // local
 mod parser;
-use parser::*;
+use parser::{Error as ParseError, *};
 
 #[derive(Parser)]
 #[grammar = "lib.pest"]
-pub struct ProteusMd;
+pub struct DeimosMd;
 
 /// Parses a given source (`src`) string into HTML.
-fn parse(src: &str) -> Result<String, PestError<Rule>> {
+fn parse(src: &str) -> Result<String, ParseError> {
     let mut ast: Vec<AstNode> = Vec::new();
 
-    let exp = ProteusMd::parse(Rule::any_type, src)?;
+    let exp = match DeimosMd::parse(Rule::any_type, src) {
+        Ok(r) => r,
+        Err(_) => return Err(ParseError::Invalid),
+    };
     // todo: fix doc pest grammar implementation
     for pair in exp {
         println!("In parse(): {:#?}", pair.as_rule());
@@ -37,7 +40,7 @@ fn parse(src: &str) -> Result<String, PestError<Rule>> {
             Ok(v) => {
                 final_output.push_str(v.as_str());
             }
-            Err(e) => {}
+            Err(error) => return Err(error),
         }
     }
 
@@ -92,13 +95,14 @@ mod output_tests {
     use super::*;
     #[test]
     fn check_complete() {
-        let p = parse("## This is a markdown document\nThis is some **rich** *text*, with ~~strikethrough~~, ^superscript^, __subscript__, and more!\n");
+        let p = parse("# This is a markdown document\nThis is some **rich** *text*, with ~~strikethrough~~, ^superscript^, __subscript__, and more!\n");
+        assert_eq!(p.unwrap(), "<h2>This is a markdown document</h2>\n<p>This is some <strong>rich</strong> <em>text</em>, with <del>strikethrough</del>, <sup>superscript</sup>, <sub>subscript</sub>, and more!\n");
     }
 
     #[test]
     fn check_table_output() {
-        let p = parse("| Test | Second Heading |\n| Value | Other Value |");
-        assert_eq!(p.unwrap(), "<table><tr><th>Test</th><th>Second Heading</th></tr><tr><td>Value</td><td>Other Value</td></tr>")
+        let p = parse("| Test | Second Heading |\n| Value | Other Value |").unwrap();
+        assert_eq!(p, "<table><tr><th>Test</th><th>Second Heading</th></tr><tr><td>Value</td><td>Other Value</td></tr>")
     }
 }
 
@@ -109,17 +113,36 @@ mod parser_tests {
 
     #[test]
     fn verify_paragraphs() {
-        let p = ProteusMd::parse(
+        let p = DeimosMd::parse(
             Rule::paragraph,
-            "**This is bold**. *This is italics*. ^This is superscript^. ___This is subscript___",
+            "**This is bold**. *This is italics*. ^This is superscript^. ___This is subscript___\n",
         );
-        //        assert!(p.is_ok());
+        assert!(p.is_ok());
     }
 
     #[test]
     fn verify_headings() {
-        let h = ProteusMd::parse(Rule::header, "\n### Test\n");
+        let h = DeimosMd::parse(Rule::header, "## Test123\n");
+        println!("{:#?}", h);
         assert!(h.is_ok());
         //        assert_eq!();
     }
+
+    #[test]
+    fn verify_tables() {}
+
+    #[test]
+    fn verify_unordered_list() {}
+
+    #[test]
+    fn verify_ordered_list() {}
+
+    #[test]
+    fn verify_checked_list_item() {}
+
+    #[test]
+    fn verify_fenced_code() {}
+
+    #[test]
+    fn verify_footnotes() {}
 }
