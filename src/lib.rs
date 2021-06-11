@@ -7,8 +7,8 @@ use pest::{error::Error as PestError, Parser};
 use pest_derive::*;
 
 // local
-mod parser;
-use parser::{Error as ParseError, *};
+mod lex;
+use lex::{Error as ParseError, *};
 
 #[derive(Parser)]
 #[grammar = "lib.pest"]
