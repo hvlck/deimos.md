@@ -2,131 +2,193 @@
 
 use std::{convert::TryInto, unimplemented};
 
-// crates
-use pest::{error::Error as PestError, Parser};
-use pest_derive::*;
-
 // local
 mod lex;
-use lex::{Error as ParseError, *};
+use lex::{LexError, *};
 
-#[derive(Parser)]
-#[grammar = "lib.pest"]
-pub struct DeimosMd;
+#[derive(Debug)]
+pub struct Lexer<'a> {
+    source: &'a str,
+    start: usize,
+    index: usize,
+    line: usize,
+}
 
-/// Parses a given source (`src`) string into HTML.
-fn parse(src: &str) -> Result<String, ParseError> {
-    let mut ast: Vec<AstNode> = Vec::new();
-
-    let exp = match DeimosMd::parse(Rule::any_type, src) {
-        Ok(r) => r,
-        Err(_) => return Err(ParseError::Invalid),
-    };
-    // todo: fix doc pest grammar implementation
-    for pair in exp {
-        println!("In parse(): {:#?}", pair.as_rule());
-        match pair.as_rule() {
-            Rule::any_type | Rule::doc => {
-                ast.push(parse_to_ast(pair));
-            }
-            _ => ast.push(AstNode::Error(Error::Invalid)),
+impl<'a> Lexer<'a> {
+    fn new(source: &str) -> Lexer {
+        Lexer {
+            source,
+            start: 0,
+            index: 0,
+            line: 0,
         }
     }
 
-    let mut final_output = String::new();
-    for i in ast {
-        println!("{:#?}", i);
-        match i.to_output() {
-            Ok(v) => {
-                final_output.push_str(v.as_str());
-            }
-            Err(error) => return Err(error),
+    // returns current character without advancing lexer
+    fn peek(&self) -> Option<char> {
+        self.source.chars().nth(self.index)
+    }
+
+    // returns the nth character after index without advancing lexer
+    fn peek_nth(&self, idx: usize) -> Option<char> {
+        self.source.chars().nth(self.index + idx)
+    }
+
+    fn peek_span(&self, idx: usize) -> &String {
+        &self
+            .source
+            .chars()
+            .enumerate()
+            .filter(|(idx, _)| {
+                idx >= &self.index && idx.clone() <= self.index.clone() + idx.clone()
+            })
+            .map(|(_, ch)| ch.to_owned())
+            .collect::<String>()
+    }
+
+    // returns next character and advances lexer by one
+    fn next(&mut self) -> Option<char> {
+        if !self.is_ended() {
+            self.index += 1;
+        }
+
+        self.peek()
+    }
+
+    fn next_nth(&mut self, idx: usize) -> Option<char> {
+        if !self.is_ended() {
+            self.index += idx;
+        }
+
+        self.peek_nth(idx)
+    }
+
+    fn is_ended(&self) -> bool {
+        self.index > self.source.len()
+    }
+
+    /// creates a span and updates lexer placing
+    fn span(&mut self) -> (usize, usize) {
+        let s = (self.start, self.index);
+        self.start = self.index;
+
+        s
+    }
+
+    fn advance_line(&mut self) {
+        self.start = 0;
+        self.index = 0;
+        self.line += 1;
+    }
+
+    fn create_token(&mut self, token_type: Token) -> Tok<'a> {
+        Tok {
+            token_type,
+            span: self.span(),
+            source: self.source,
         }
     }
 
-    Ok(final_output)
-}
+    fn to_next(&mut self, character: &str) -> (String, usize) {
+        let mut span = String::new();
+        let mut idx: usize = 0;
+        while let Some(v) = self.peek_nth(character.len()) {
+            println!("character: {}, v: {}\n\n\n", character, v);
+            let v = v.to_string();
+            if v == character {
+                break;
+            } else {
+                idx += 1;
+                span.push_str(&v);
 
-/// Parses tokens into an AST
-fn parse_to_ast(pair: pest::iterators::Pair<Rule>) -> AstNode {
-    println!("In parse_to_ast: {:#?}", pair.as_rule());
-    match pair.as_rule() {
-        Rule::any_type | Rule::doc => parse_to_ast(pair.into_inner().next().unwrap()),
-        Rule::header => {
-            let mut pair = pair.into_inner();
-            let (level, text): (u8, &str) = match pair.next() {
-                Some(v) => {
-                    let matches: Vec<&str> = v.as_str().matches('#').collect();
-                    let level: u8 = match matches.len() {
-                        1..=6 => matches.len().try_into().unwrap(),
-                        _ => return AstNode::Error(Error::Invalid),
-                    };
-
-                    let text = v.as_str().split_at((level + 1).into()).1;
-                    (level, text)
-                }
-                None => return AstNode::Error(Error::Invalid),
-            };
-            AstNode::Heading { level, text }
-        }
-        Rule::paragraph => {
-            let t = pair.into_inner();
-            println!("T: {:#?}", t);
-            for pair in t {
-                parse_rich_text(pair);
+                self.next();
             }
-
-            AstNode::Error(Error::Invalid)
         }
-        _ => unimplemented!(),
+
+        (span, idx)
+    }
+
+    fn to_next_token(&mut self) -> String {
+        let mut span = String::new();
+        while let Some(v) = self.peek() {
+            match v {
+                '*' | '_' | '~' | '^' | '#' => break,
+                _ => span.push(v),
+            }
+        }
+
+        span
     }
 }
 
-fn parse_rich_text(pair: pest::iterators::Pair<Rule>) -> Result<AstNode, Error> {
-    println!("In parse_rich_text: {:#?}", pair.as_rule());
-    Ok(AstNode::Code(CodeBlock {
-        block_type: CodeType::Fenced,
-        contents: String::from("Test"),
-    }))
+pub fn tokenise(src: &str) -> Result<Vec<Tok>, LexError> {
+    let mut tokens = Vec::new();
+    let mut lexer = Lexer::new(src);
+
+    while !lexer.is_ended() {
+        let c = lexer.peek();
+        lexer.next();
+
+        match c {
+            Some(c) => {
+                let tok = match c {
+                    '*' => match lexer.peek() {
+                        Some(c) if c == '*' => {
+                            let (txt, idx) = lexer.to_next("**");
+                            Token::Bold(txt)
+                        }
+                        Some(_) => {
+                            let (txt, idx) = lexer.to_next("*");
+                            Token::Italics(txt)
+                        }
+                        None => Token::EOI,
+                    },
+                    '/' => match lexer.peek() {
+                        Some(c) if c == '/' => {
+                            if let Some(c) = lexer.peek_nth(1) {
+                                match c {
+                                    _ => {
+                                        lexer.advance_line();
+                                        Token::Comment
+                                    }
+                                }
+                            } else {
+                                Token::EOI
+                            }
+                        }
+                        Some(_) => Token::Text(c.to_string()),
+                        None => Token::EOI,
+                    },
+                    '\t' | '\r' | ' ' => Token::Whitespace,
+                    '\n' => {
+                        lexer.advance_line();
+                        Token::Whitespace
+                    }
+                    _ => Token::Text(String::from(c)),
+                };
+
+                tokens.push(lexer.create_token(tok))
+            }
+            None => tokens.push(lexer.create_token(Token::EOI)),
+        }
+    }
+
+    Ok(tokens)
 }
 
+/// Tests for lexing grammar
 #[cfg(test)]
-mod output_tests {
-    use super::*;
-    #[test]
-    fn check_complete() {
-        let p = parse("# This is a markdown document\nThis is some **rich** *text*, with ~~strikethrough~~, ^superscript^, __subscript__, and more!\n");
-        assert_eq!(p.unwrap(), "<h2>This is a markdown document</h2>\n<p>This is some <strong>rich</strong> <em>text</em>, with <del>strikethrough</del>, <sup>superscript</sup>, <sub>subscript</sub>, and more!\n");
-    }
-
-    #[test]
-    fn check_table_output() {
-        let p = parse("| Test | Second Heading |\n| Value | Other Value |").unwrap();
-        assert_eq!(p, "<table><tr><th>Test</th><th>Second Heading</th></tr><tr><td>Value</td><td>Other Value</td></tr>")
-    }
-}
-
-/// Tests for parsing grammar
-#[cfg(test)]
-mod parser_tests {
+mod lex_tests {
     use super::*;
 
     #[test]
     fn verify_paragraphs() {
-        let p = DeimosMd::parse(
-            Rule::paragraph,
-            "**This is bold**. *This is italics*. ^This is superscript^. ___This is subscript___\n",
-        );
-        assert!(p.is_ok());
+        let t = tokenise("This is a paragraph. **Bold text.** *Italics text.*").unwrap();
+        println!("{:#?}", t);
     }
 
     #[test]
-    fn verify_headings() {
-        let h = DeimosMd::parse(Rule::header, "## Test123\n");
-        println!("{:#?}", h);
-        assert!(h.is_ok());
-        //        assert_eq!();
-    }
+    fn verify_headings() {}
 
     #[test]
     fn verify_tables() {}
