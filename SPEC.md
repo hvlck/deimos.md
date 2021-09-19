@@ -14,6 +14,7 @@ Note that this is originally based on the original [saturn](https://github.com/h
 #### Minor Goals
 
 + be easy to be converted into digital form from print using OCR
++ should produce valid html for use by read-it-later services like Pocket or Instapaper
 
 ## Syntax
 
@@ -29,15 +30,37 @@ Note that this is originally based on the original [saturn](https://github.com/h
 + used to create a footnote
   + ex: `^1{[github](https://github.com)}`
 + valid markdown can go within the parenthesis
-+ can also sdeimos multiple lines
++ can also span multiple lines
++ references should also be generated at the footnote output to link back to the original place where the footnote was cited
 
 #### Footnote Output
+
+```deimos
+This is a paragraph referencing something else^1.
+
+^1{[Title, Person et al, 2021](link-to-place.org)}
+```
+
+should generate
+
+```deimos
+<p>This is a paragraph referencing something else<a id="ref:1" href="#fn:1" role="doc-noteref"><sup>[1]</sup></a></p>
+<p><a id="fn:1">[1]</a> <a href="link-to-place.org">Title, Person et al, 2021</a> (<a href="#ref:1">Back</a>)</p>
+```
+
+#### Endnotes
+
+##### Endnote Output
 
 ### Endnotes
 
 ### Escaping
 
 + `\` backslashes used to escape formatting
+
+### Fragments
+
++ fragments allow for embedding other `deimos` notes, similar to `<iframes>`
 
 ### Images
 
@@ -117,6 +140,8 @@ The previous code block will produce the following HTML output:
 ```html
 <pre><code>const name = "Generic Name"</code></pre>
 ```
+
++ fenced code blocks should be linkable (generated html should have an id, e.g. `code-{x}`)
 
 #### Inline Code Blocks
 
@@ -281,5 +306,3 @@ Influences on Deimos:
 ## See Also
 
 + [Chart.js | Chart.js](https://www.chartjs.org/docs/latest/) - planning for chart/graphic syntax
-
-

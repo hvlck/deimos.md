@@ -188,7 +188,11 @@ mod lex_tests {
     }
 
     #[test]
-    fn verify_headings() {}
+    fn verify_headings() {
+        let t = tokenise("# This is a top level heading").unwrap();
+        assert_eq!(t.len(), 1);
+        // assert_eq!(matches!(t.get(0).unwrap().token_type, Token::Heading));
+    }
 
     #[test]
     fn verify_tables() {}
